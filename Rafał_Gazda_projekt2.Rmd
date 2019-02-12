@@ -1,0 +1,169 @@
+---
+title: "Sprawozdanie"
+author: "Rafa≈Ç Gazda"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(e1071)
+library(car)
+library(lawstat) 
+library(aod)
+library(lmtest)
+library(randtests)
+library(strucchange)
+  MyData <- read.csv(file="C:/Users/Gazi/Desktop/Matematyka ekonomiczna/Projekt2/DaneZ2.csv", header=TRUE, sep=",")
+  MyData
+```
+
+## Opis danych
+
+ZbiÛr zawiera 7 zmiennych- jednπ objaúnianπ (bwght- waga dziecka po urodzeniu w gramach), oraz 6 zmiennych objaúniajπcych:npvis (liczba wizyt ginekologicznych przed porodem), fage (wiek ojca w latach), cigs (úrednia dzienna liczba palonych papierosÛw przez matkÍ), drink (úrednia tygodniowa liczba drikÛw alkoholowych spoøywanych przez matkÍ), pree (zmienna binarna- 1 jeøeli dziecko jest wczeúniakiem), male (zmienna binarna, 1 jeøeli dziecko jest ch≥opcem).
+
+## Podstawowe statystyki
+
+```{r}
+MyData <- na.omit(MyData)
+
+stats <-  lapply( MyData , function(x) rbind( mean = mean(x) ,
+                                         sd = sd(x) ,
+                                         median = median(x) ,
+                                         minimum = min(x) ,
+                                         maximum = max(x) ,
+                                         kurtosis = kurtosis(x),
+                                         skewness = skewness(x),
+                                         coeff = sd(x)/mean(x) * 100
+                                         ))
+
+data.frame(stats)
+```
+Na podstawie podstawowych statystyk moøna zauwaøyÊ, øe brakuje nam niektÛrych danych oraz wartoúci sπ rÛønej skali, widaÊ to szczegÛlnie przy wspÛ≥czynniku zmiennoúci, ktÛry dla niektÛrych danych jest bardzo wysoki. 
+Aby poradziÊ sobie z brakujπcymi danymi, usunÍ wiersze, w ktÛrych siÍ one znajdujπ. W tym przypadku usuniÍcie wierszy nie jest z≥π metodπ, poniewaø posiadamy duøo obserwacji. W innych przypadkach moøna uøyÊ procedur takich jak Amelia 2, Mice, mitools. Dla wszystkich zmiennych oprÛcz _male_ kurtoza jest wiÍksza od zera, co oznacz, øe rozk≥ad prawdopodobieÒstwo jest leptokurtyczna (wartoúci cechy bardziej skoncentrowane niø przy rozk≥adzie normalnym). Zmienne _bwght_ i _male_ majπ rozk≥ad lewostronnej asymetrii, a reszta zmiennych ma rozk≥ad prawostronnej asymetrii.
+
+Do rozwiπzania problemu ze skalπ danych uøyjÍ standaryzacji.
+
+```{r}
+  MyData <- as.data.frame(scale(MyData))
+```
+
+## Model MNK
+
+```{r}
+  MNK_liniowy <- lm(formula = bwght ~ 1 + npvis + fage + cigs + drink + pree + male, data = MyData)
+```
+Po stworzeniu modelu naleøy siÍ zastanowiÊ, ktÛre ze zmiennych sπ statystycznie istotnie do tego zostanie uøyty test t-studenta i metoda krokowa wsteczna. Jednak aby mÛc siÍ opieraÊ na statystyce t-studenta, muszÍ najpierw przeprowadziÊ test normalnoúci reszt Shapiro Wilka.
+
+```{r}
+resi <- MNK_liniowy$residuals
+shapiro.test(resi)
+```
+
+Hipoteza zerowa tego testu jest na tyle duøa, øe nie mamy podstaw do odrzucenia hipotezy H0, ktÛra zak≥ada normalnoúÊ reszt rozk≥adu, a co za tym idzie moøemy siÍ opieraÊ na statystyce t-studenta.
+
+```{r}
+  summary(MNK_liniowy)
+```
+
+Na podstawie metody krokowo wstecznej moøemy odrzuciÊ zmiennπ drink, poniewaø nie jest ona istotna statystycznie.
+
+```{r}
+  MNK_liniowy <- lm(formula = bwght ~ 1 + npvis + fage + cigs + pree + male, data = MyData)
+  resi <- MNK_liniowy$residuals
+  shapiro.test(resi)
+  summary(MNK_liniowy)
+```
+
+Dla 95% poziomu istotnoúci reszta zmiennych jest isotna, wiÍc zostawiam model w takiej postaci. Ostateczny model nie opisuje zadowalajπco zjawiska, poniewaø _R-kwadrat_ wynosi oko≥o 0.2. 
+
+## Przekszta≥cenie modelu
+
+Przed przejúciem do dalszej czÍsci projektu muszÍ odpowiedzieÊ czy ta postaÊ modelu jest prawid≥owa. Zaczynam od sprawdzenia czy liniowa postaÊ modelu jest optymalna z wykorzystaniem testu _RESET Ramsey'a_, ktÛry porÛwnuje jπ do zaleønoúci kwadratowej i szeúciennej.
+
+```{r}
+resettest(MNK_liniowy)
+```
+
+Taka wartoúÊ _p-value_ nie pozwala na odrzucenie hipotezy zerowej mÛwiπcej o tym, øe ta postaÊ liniowa modelu jest najlepsza z trzech porÛwnywanych. Wskazywa≥oby to na fakt, øe ta postaÊ modelu jest najoptymalniejsza. Aby siÍ upewniÊ zastosujemy test _serii Walda-Wolfowitza_.
+
+```{r}
+runs.test(resi)
+```
+
+Tutaj rÛwnieø _p-value_ nie pozwala na odrzucenie hipotezy zerowej, czyli moøna uznaÊ, øe ta postaÊ modelu jest optymalna.
+
+
+## KoincydentnoúÊ modelu
+```{r}
+summary(MNK_liniowy)
+cor(MyData, method = c("pearson"))
+```
+  Model jest koincydentny, poniewaø znaki odpowiednich wartoúci w korelacji pearsona sπ takie same jak znaki przy odpowiednich parametrach modelu.
+
+## WspÛ≥liniowoúÊ modelu
+```{r}
+vif(MNK_liniowy)
+```
+Zmienne nie sπ wspÛ≥liniowe, poniewaø wartoúÊ testu w kaødym przypadku jest mniejsza niø 10.
+
+## Test Chowa
+NastÍpnie stosuje test _Chow'a_ by sprawdziÊ stabilnoúÊ postaci modelu (hipoteza zerowa tego testu moøee byÊ interpretowana jako stabilnoúÊ postaci modelu)
+
+```{r}
+sctest(bwght ~ npvis + fage + cigs + pree + male, type="Chow",data=MyData)
+```
+W tym przypadku wartúÊ _p-value_ dla normalnie wykorzystywanych poziomÛw istotno≈õci (0.9, 0.95, 0.99) nie daje podstaw do odrzucenia _H0_, a zatem moøemy mÛwiÊ tutaj o stabilnej postaci modelu. NastÍpnie zbadam wystÍpowanie zjawiska autokorelacjii wykorzystujπc test _Durbina-Watsona_.
+
+## Test Durbina-Watsona
+```{r}
+dwtest(MNK_liniowy)
+```
+
+W tym przypadku rÛwnieø wartoúÊ _p-value_ jest na tyle duøa by nie daÊ podstaw do odrzucenia _H0_, ktÛra w tym przypadku mÛwi o braku zjawiska autokorelacji, a zatem o niezaleønoúci sk≥adnika losowego modelu.
+
+## Test Goldfielda-Quandta
+NastÍpnym przeprowadzonym przeze mnie testem jest test _Goldfielda-Quandta_ pozwalajπcy sprawdziÊ czy w modelu wystÍpuje zjawisko hetero/homoskedastycznoúci.
+
+```{r}
+gqtest(MNK_liniowy)
+```
+
+Tutaj rÛwnieø _p-value_ jest na tyle duøe i nie ma podstaw do odrzucenia hipotezy _H0_, ktÛra mÛwi o sta≥oÊi wariancji sk≥adnika losowego.
+
+## Test serii
+H0: dobÛr jednostek do prÛby jest losowy; model jest liniowy.
+H1: dobÛr jednostek do prÛby nie jest losowy; model jest nieliniowy.
+
+```{r}
+runs.test(MyData$bwght)
+```
+Poniewaø p-value jest mniejsze od 0.05 to oznacza, øe nie ma podstaw do odrzucenia hipotezy H0.
+
+## Test istotnoúci zmiennych
+```{r, echo=FALSE}
+wald.test(b=coef(object=MNK_liniowy), Sigma=vcov(object=MNK_liniowy), Terms=2)
+```
+Poniewaø p-value jest mniejsze od 0.05 to oznacz, øe nie podstaw do odrzucenia H0, czyli ≥πcznie zmienne sπ istotne.
+
+## Interpretacja parametrÛw
+```{r, echo=FALSE}
+  summary(MNK_liniowy)
+```
+
+ W ostatecznym zestanderyzowanym modelu wszystkie zmienne sπ istotne.
+  Zmienne, ktÛrych wzrost wp≥ywa na powiÍkszenie masy cia≥a dziecka to:
+  - npvis (liczba wizyt ginekologicznych)
+  - fage (wiek ojca)
+  - male (p≥eÊ, w tym przypadku p≥eÊ mÍska wp≥ywa na wzrost wagi)
+  Zmienne, ktÛrych wzrost wp≥ywa na zmniejszenie siÍ masy cia≥a dziecka to:
+  - cigs (úrednia dzienna liczba palonych papierosÛw przez matkÍ)
+  - pree (zmienna binarna- 1 jeøeli dziecko jest wczeúniakiem)
+  
+  przy za≥oøeniu ceteris paribus o reszcie parametrÛw sta≥ych.
+  
+  Zmienna, ktÛra ma najwiÍkszy wp≥ywa na masÍ dziecka to `pree`. A zmienna, ktÛra ma najmniejszy wp≥ywa na masÍ dziecka to `fage`.
