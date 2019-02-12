@@ -1,0 +1,2 @@
+# Model-MNK
+Zbiór zawiera 7 zmiennych- jedną objaśnianą (bwght- waga dziecka po urodzeniu w gramach), oraz 6 zmiennych objaśniających:npvis (liczba wizyt ginekologicznych przed porodem), fage (wiek ojca w latach), cigs (średnia dzienna liczba palonych papierosów przez matkę), drink (średnia tygodniowa liczba drików alkoholowych spożywanych przez matkę), pree (zmienna binarna- 1 jeżeli dziecko jest wcześniakiem), male (zmienna binarna, 1 jeżeli dziecko jest chłopcem).
